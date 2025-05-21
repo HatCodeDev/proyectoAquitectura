@@ -32,15 +32,28 @@ export interface MipsInstructionFields {
 
 // OPERANDOS PARSEADOS (ANTES DE CONVERTIR A NÚMEROS/BINARIO)
 export interface ParsedOperands {
-  rsName?: string; // Ej: $t0
-  rtName?: string;
-  rdName?: string;
-  immediateValue?: number | string; // Puede ser número o etiqueta antes de resolver
-  addressLabel?: string; // Para saltos
+  // Para instrucciones tipo R y algunas I
+  rdName?: string;         // Ej: "$t0"
+  rsName?: string;         // Ej: "$s1"
+  rtName?: string;         // Ej: "$s2"
   shamtValue?: number;
-  // Para formatos como offset(base) en lw/sw
-  offset?: number | string; // Puede ser número o etiqueta
-  baseRegister?: string; // Ej: $sp
+
+  // Para instrucciones tipo I (addi, lw, sw, beq)
+  immediateValue?: number; // Para addi, o el offset para lw/sw, beq
+  labelName?: string;      // Para beq, j (la etiqueta literal)
+
+  // Para lw/sw con formato "offset(base)"
+  // 'immediateValue' contendrá el offset.
+  // 'rsName' (o un nuevo campo si prefieres) contendrá el registro base.
+  // Por simplicidad inicial, podemos tratar de encajarlo en rsName e immediateValue
+  // o podrías tener:
+  // baseRegisterForOffset?: string; // Ej: "$sp" para lw $t0, 0($sp)
+
+  // Para tipo J (j, jal)
+  // 'labelName' o 'addressLabel' puede usarse para el target_address.
+
+  // Para shamt en instrucciones de shift (aún no las implementamos)
+  // shamtValue?: number;
 }
 
 // RESULTADO DE LA INTERPRETACIÓN (ESTA ES LA IMPORTANTE PARA EL ERROR DE 'tokenized')

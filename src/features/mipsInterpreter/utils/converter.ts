@@ -6,48 +6,7 @@ import { MipsError, ParsedOperands, InstructionDefinition, MipsInstructionFields
  * Convierte un número a su representación binaria con un número específico de bits.
  * Puede manejar números con signo usando complemento a dos.
  */
-export function numToBinary(num: number, bits: number, signed: boolean = false): string | MipsError {
-  if (isNaN(num)) {
-    return { message: `Valor inválido para conversión a binario: no es un número.`, stage: 'conversion' };
-  }
 
-  let binaryString;
-  if (signed && num < 0) {
-    // Complemento a dos para números negativos
-    binaryString = (num >>> 0).toString(2); // Tratar como sin signo de 32 bits para obtener representación de C2
-    if (binaryString.length > bits) {
-      binaryString = binaryString.slice(binaryString.length - bits); // Tomar los bits menos significativos si la representación es más larga
-    } else {
-      // Extender con '1's si la representación es más corta que los bits deseados (extensión de signo implícita por >>> 0 para negativos)
-      // Si num es, por ejemplo, -1 y bits es 16, (num >>> 0).toString(2) da '11111111111111111111111111111111'
-      // y luego se corta a '1111111111111111' si bits es 16.
-      // Si fuera -1 y bits es 5, la lógica anterior lo cortaría a '11111'.
-      binaryString = binaryString.padStart(bits, '1'); // Aunque >>> 0 para 32 bits usualmente hace esto bien.
-                                                      // Este padStart es más una salvaguarda o para casos donde la representación de 32 bits
-                                                      // se trunca y luego necesita ser re-extendida a 'bits' si 'bits' < 32.
-                                                      // La clave es que slice(binaryString.length - bits) ya debería darte la longitud correcta.
-    }
-  } else {
-    // Para números positivos o sin signo
-    if (num >= Math.pow(2, signed ? bits - 1 : bits)) { // Chequeo de overflow para positivos
-         return { message: `Número ${num} demasiado grande para <span class="math-inline">\{bits\} bits</span>{signed ? ' con signo' : ''}.`, stage: 'conversion'};
-    }
-    binaryString = num.toString(2);
-    binaryString = binaryString.padStart(bits, '0');
-  }
-
-  if (binaryString.length !== bits) {
-      // Esto puede ocurrir si el slice y padStart no se comportaron como esperado para negativos muy específicos.
-      // O si un positivo era demasiado grande y el chequeo de overflow falló.
-      // Re-asegurar el corte a la longitud correcta, especialmente después de manipulaciones.
-      if (binaryString.length > bits) {
-          binaryString = binaryString.slice(binaryString.length - bits);
-      } else { // Si es más corto, algo raro pasó, pero intentamos pad.
-          binaryString = binaryString.padStart(bits, signed && num < 0 ? '1' : '0');
-      }
-  }
-  return binaryString;
-}
 
 /**
  * Obtiene la representación binaria de 5 bits para un nombre de registro.

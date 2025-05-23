@@ -1,17 +1,6 @@
-// src/components/mips/FieldsBreakdown.tsx
 import React from 'react';
-// --- IMPORTACIONES SEPARADAS DE HEROUI ---
-import { Card, CardHeader, CardBody } from "@heroui/card"; // CardFooter no se usa aquí
-import { Code } from '@heroui/code';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableColumn,
-  TableRow,
-  TableCell
-} from "@heroui/table";
-// --- FIN IMPORTACIONES HEROUI ---
+import { Card, CardHeader, CardBody } from "@heroui/react";
+import { Code, Table, TableHeader, TableBody, TableColumn, TableRow, TableCell } from "@heroui/react";
 import { MipsInstructionFields, InstructionType } from '@/types';
 
 interface FieldsBreakdownProps {
@@ -41,26 +30,20 @@ const fieldDefinitions: Record<InstructionType, Array<{ fieldKey: keyof MipsInst
   'Unknown': [],
 };
 
-const columns = [
-  { key: 'label', label: 'CAMPO' },
-  { key: 'value', label: 'VALOR BINARIO' },
-  { key: 'bits', label: 'BITS' },
-];
-
-// Definimos el tipo para nuestros items de fila para mayor claridad y seguridad de tipos
 interface RowDataItem {
   id: string;
   label: string;
-  value: string; // El valor del campo MIPS (binario)
+  value: string;
   bits: number;
 }
 
 export const FieldsBreakdown: React.FC<FieldsBreakdownProps> = ({ fields, instructionType }) => {
-  if (!fields || !instructionType || instructionType === 'Unknown' || !fieldDefinitions[instructionType] || fieldDefinitions[instructionType].length === 0) {
-    return null;
-  }
+  if (!fields || !instructionType || instructionType === 'Unknown') return null;
 
-  const rowsData: RowDataItem[] = fieldDefinitions[instructionType]
+  const fieldInfoList = fieldDefinitions[instructionType];
+  if (!fieldInfoList || fieldInfoList.length === 0) return null;
+
+  const rowsData: RowDataItem[] = fieldInfoList
     .filter(fieldInfo => fields[fieldInfo.fieldKey] !== undefined)
     .map((fieldInfo, index) => ({
       id: `${instructionType}-${fieldInfo.fieldKey}-${index}`,
@@ -69,56 +52,32 @@ export const FieldsBreakdown: React.FC<FieldsBreakdownProps> = ({ fields, instru
       bits: fieldInfo.bits,
     }));
 
-  if (rowsData.length === 0) {
-    return null;
-  }
-
   return (
     <Card className="w-full shadow-lg mt-6">
-      <CardHeader className="pb-2">
-        <h3 className="text-xl font-semibold text-foreground">Desglose de Campos (Formato {instructionType})</h3>
+      <CardHeader>
+        <h3 className="text-xl font-semibold text-foreground">
+          Desglose de Campos (Formato {instructionType})
+        </h3>
       </CardHeader>
-      <CardBody className="pt-2">
-        <Table
-          aria-label={`Desglose de campos para instrucción tipo ${instructionType}`}
-          removeWrapper
-          className="min-w-full"
-        >
-          <TableHeader columns={columns}>
-            {(column) => (
-              <TableColumn
-                key={column.key}
-                className="text-left text-sm font-semibold text-default-600 dark:text-default-300 uppercase bg-default-100 dark:bg-default-50/50 px-3 py-2"
-                style={{ textAlign: column.key === 'bits' ? 'right' : 'left' }}
-              >
-                {column.label}
-              </TableColumn>
-            )}
+      <CardBody>
+        <Table removeWrapper aria-label={`Desglose de campos para instrucción tipo ${instructionType}`}>
+          <TableHeader>
+            <TableColumn>CAMPO</TableColumn>
+            <TableColumn>VALOR BINARIO</TableColumn>
+            <TableColumn className="text-right">BITS</TableColumn>
           </TableHeader>
-          <TableBody items={rowsData} emptyContent={"No hay campos para mostrar."}>
-            {(item: RowDataItem) => ( // Especificamos el tipo de 'item'
-              <TableRow key={item.id} className="border-b border-default-200 dark:border-default-100 last:border-b-0">
-                {(columnKey) => {
-                  // Acceso directo a la propiedad del item usando la columnKey
-                  // Aseguramos que columnKey es una clave válida de RowDataItem
-                  const cellValue = item[columnKey as keyof RowDataItem];
-
-                  return (
-                    <TableCell
-                      className={`px-3 py-2 ${columnKey === 'label' ? 'font-medium text-foreground' : ''} ${columnKey === 'bits' ? 'text-right text-default-500' : ''}`}
-                    >
-                      {columnKey === 'value' ? (
-                        <Code color="default" className="text-sm bg-transparent p-0">
-                          {String(cellValue)}
-                        </Code>
-                      ) : (
-                        String(cellValue) 
-                      )}
-                    </TableCell>
-                  );
-                }}
+          <TableBody emptyContent="No hay campos para mostrar.">
+            {rowsData.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">{item.label}</TableCell>
+                <TableCell>
+                  <Code color="default" className="text-sm bg-transparent p-0">
+                    {item.value}
+                  </Code>
+                </TableCell>
+                <TableCell className="text-right text-default-500">{item.bits}</TableCell>
               </TableRow>
-            )}
+            ))}
           </TableBody>
         </Table>
       </CardBody>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Input } from '@heroui/input';
-import { Button } from '@heroui/button';
+import { Button } from '@heroui/react'; // Usar Button de @heroui/react
 
 interface MipsInputFormProps {
   onSubmit: (instruction: string) => Promise<void>;
@@ -31,6 +31,7 @@ export const MipsInputForm: React.FC<MipsInputFormProps> = ({ onSubmit, isLoadin
       <Button
         type="submit"
         color="primary"
+        variant="shadow"
         isLoading={isLoading}
         disabled={isLoading || !instruction.trim()}
         className="w-full sm:w-auto"

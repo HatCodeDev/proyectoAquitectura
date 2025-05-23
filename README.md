@@ -63,7 +63,7 @@ Este proyecto fue construido utilizando las siguientes tecnologías:
 Ejecuta el siguiente comando para clonar el proyecto:
 
 ```bash
-git clone https://github.com/frontio-ai/vite-template.git
+git clone https://github.com/HatCodeDev/proyectoAquitectura.git
 ```
 
 ### Instala las depecndencias

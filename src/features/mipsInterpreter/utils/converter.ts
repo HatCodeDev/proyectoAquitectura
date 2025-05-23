@@ -11,41 +11,44 @@ export function numToBinary(num: number, bits: number, signed: boolean = false):
     return { message: `Valor inválido para conversión a binario: no es un número.`, stage: 'conversion' };
   }
 
-  let binaryString;
-  if (signed && num < 0) {
-    // Complemento a dos para números negativos
-    binaryString = (num >>> 0).toString(2); // Tratar como sin signo de 32 bits para obtener representación de C2
-    if (binaryString.length > bits) {
-      binaryString = binaryString.slice(binaryString.length - bits); // Tomar los bits menos significativos si la representación es más larga
-    } else {
-      // Extender con '1's si la representación es más corta que los bits deseados (extensión de signo implícita por >>> 0 para negativos)
-      // Si num es, por ejemplo, -1 y bits es 16, (num >>> 0).toString(2) da '11111111111111111111111111111111'
-      // y luego se corta a '1111111111111111' si bits es 16.
-      // Si fuera -1 y bits es 5, la lógica anterior lo cortaría a '11111'.
-      binaryString = binaryString.padStart(bits, '1'); // Aunque >>> 0 para 32 bits usualmente hace esto bien.
-                                                      // Este padStart es más una salvaguarda o para casos donde la representación de 32 bits
-                                                      // se trunca y luego necesita ser re-extendida a 'bits' si 'bits' < 32.
-                                                      // La clave es que slice(binaryString.length - bits) ya debería darte la longitud correcta.
-    }
+  let minValue, maxValue;
+  if (signed) {
+    minValue = -Math.pow(2, bits - 1);
+    maxValue = Math.pow(2, bits - 1) - 1;
   } else {
-    // Para números positivos o sin signo
-    if (num >= Math.pow(2, signed ? bits - 1 : bits)) { // Chequeo de overflow para positivos
-         return { message: `Número ${num} demasiado grande para <span class="math-inline">\{bits\} bits</span>{signed ? ' con signo' : ''}.`, stage: 'conversion'};
-    }
-    binaryString = num.toString(2);
-    binaryString = binaryString.padStart(bits, '0');
+    minValue = 0;
+    maxValue = Math.pow(2, bits) - 1;
   }
 
-  if (binaryString.length !== bits) {
-      // Esto puede ocurrir si el slice y padStart no se comportaron como esperado para negativos muy específicos.
-      // O si un positivo era demasiado grande y el chequeo de overflow falló.
-      // Re-asegurar el corte a la longitud correcta, especialmente después de manipulaciones.
-      if (binaryString.length > bits) {
-          binaryString = binaryString.slice(binaryString.length - bits);
-      } else { // Si es más corto, algo raro pasó, pero intentamos pad.
-          binaryString = binaryString.padStart(bits, signed && num < 0 ? '1' : '0');
-      }
+  if (num < minValue || num > maxValue) {
+    return {
+      message: `Número ${num} fuera de rango para ${bits} bits${signed ? ' con signo' : ''}. Rango esperado: [${minValue} a ${maxValue}].`,
+      stage: 'conversion',
+    };
   }
+
+  let binaryString;
+  if (signed && num < 0) {
+    // Cálculo explícito de complemento a dos para el número de bits especificado
+    binaryString = (Math.pow(2, bits) + num).toString(2);
+    // Asegurar que tenga la longitud correcta (puede ser más corto si Math.pow(2,bits) + num es pequeño y positivo)
+    binaryString = binaryString.padStart(bits, '0'); // Pad inicial por si acaso
+    if (binaryString.length > bits) { // Si num era muy negativo, podría tener más de 'bits' si no se valida el rango antes
+        binaryString = binaryString.slice(binaryString.length - bits);
+    }
+
+
+  } else {
+    binaryString = num.toString(2).padStart(bits, '0');
+  }
+
+  // Failsafe final, aunque las validaciones de rango deberían prevenir esto.
+  if (binaryString.length !== bits) {
+     // Esto sería una condición de error inesperada si las validaciones de rango son correctas.
+     console.error(`Error interno en numToBinary: longitud de bits inesperada. Num: ${num}, Bits: ${bits}, Result: ${binaryString}`);
+     return { message: `Error interno al generar binario de ${bits} bits para ${num}.`, stage: 'conversion' };
+  }
+
   return binaryString;
 }
 
@@ -54,15 +57,21 @@ export function numToBinary(num: number, bits: number, signed: boolean = false):
  */
 function getRegisterBinary(regName: string | undefined, operandRole: string): string | MipsError {
   if (typeof regName !== 'string' || !regName) {
-    return { message: `Registro ${operandRole} no definido.`, stage: 'conversion' };
+    return { message: `Registro para '${operandRole}' no definido.`, stage: 'conversion' };
   }
   const regNum = REGISTERS[regName];
   if (regNum === undefined) {
-    return { message: `Registro <span class="math-inline">\{operandRole\} inválido\: '</span>{regName}'.`, stage: 'conversion' };
+    // Mensaje de error corregido, sin HTML/markdown
+    return { message: `Registro para '${operandRole}' inválido: '${regName}'.`, stage: 'conversion' };
   }
-  return numToBinary(regNum, 5, false) as string; // Sabemos que no será MipsError aquí si regNum es válido
+  // numToBinary para registros siempre es sin signo y 5 bits.
+  // El chequeo de rango en numToBinary (0 a 31 para 5 bits sin signo) cubrirá si regNum es inválido.
+  const binaryReg = numToBinary(regNum, 5, false);
+  if (typeof binaryReg !== 'string') { // Propagar error de numToBinary
+      return { message: `Error al convertir número de registro para '${operandRole}' ('${regName}'): ${binaryReg.message}`, stage: 'conversion'};
+  }
+  return binaryReg;
 }
-
 
 /**
  * Ensambla la instrucción binaria de 32 bits y los campos desglosados.
@@ -72,12 +81,14 @@ export function assembleInstruction(
   operands: ParsedOperands
 ): { binary: string; fields: MipsInstructionFields } | MipsError {
   const fields: MipsInstructionFields = { opcode: definition.opcode };
-  let binaryAccumulator = definition.opcode; // Siempre 6 bits del opcode
+  let binaryAccumulator = definition.opcode;
 
   let rsBin: string | MipsError;
   let rtBin: string | MipsError;
   let rdBin: string | MipsError;
+  let shamtVal: number;
   let shamtBin: string | MipsError;
+  let immVal: number;
   let immBin: string | MipsError;
   let addrBin: string | MipsError;
 
@@ -89,8 +100,13 @@ export function assembleInstruction(
     rdBin = getRegisterBinary(operands.rdName, 'rd');
     if (typeof rdBin !== 'string') return rdBin;
 
-    shamtBin = numToBinary(operands.shamtValue || 0, 5, false); // shamt es siempre 5 bits, sin signo
-    if (typeof shamtBin !== 'string') return shamtBin; // Error de numToBinary
+    shamtVal = operands.shamtValue === undefined ? 0 : operands.shamtValue; // Default a 0 si no se parseó (ej. para add)
+    if (typeof shamtVal !== 'number' || isNaN(shamtVal)) { // Chequeo adicional por si ParsedOperands lo permite
+        return { message: `Valor de shamt '${operands.shamtValue}' no es un número válido.`, stage: 'conversion'};
+    }
+    // Validación de rango para shamt (0-31) ahora se hace en numToBinary
+    shamtBin = numToBinary(shamtVal, 5, false);
+    if (typeof shamtBin !== 'string') return { message: `Error en valor de shamt (${shamtVal}): ${shamtBin.message}`, stage: 'conversion'};
 
     if (!definition.funct) return { message: "Definición de instrucción tipo R no tiene campo 'funct'.", stage: 'conversion' };
 
@@ -98,48 +114,101 @@ export function assembleInstruction(
     binaryAccumulator += rsBin + rtBin + rdBin + shamtBin + definition.funct;
 
   } else if (definition.type === 'I') {
-    // Para tipo I, rt es a menudo el destino (addi, lw) o una fuente (sw, beq)
-    // rs es siempre una fuente.
-    rsBin = getRegisterBinary(operands.rsName, 'rs (o base para lw/sw)');
+    rsBin = getRegisterBinary(operands.rsName, 'rs (o base)');
     if (typeof rsBin !== 'string') return rsBin;
     rtBin = getRegisterBinary(operands.rtName, 'rt');
     if (typeof rtBin !== 'string') return rtBin;
 
-    if (operands.immediateValue === undefined) return { message: "Valor inmediato no definido para tipo I.", stage: 'conversion' };
-    if (typeof operands.immediateValue !== 'number') return { message: `Valor inmediato '${operands.immediateValue}' no es un número.`, stage: 'conversion' };
+    // Determinar la fuente del valor inmediato/offset
+    let immediateSource: string | number | undefined;
+    // Para beq (y bne, etc.), el parser guarda la etiqueta en labelName
+    // según formatString "rs, rt, label"
+    if (definition.mnemonic === 'beq' /* || definition.mnemonic === 'bne' etc. */) {
+        immediateSource = operands.labelName;
+        if (immediateSource === undefined) {
+            return { message: `Etiqueta no definida para instrucción '${definition.mnemonic}'.`, stage: 'conversion'};
+        }
+    } else { // Para otras instrucciones tipo I como addi, lw, sw
+        immediateSource = operands.immediateValue;
+        if (immediateSource === undefined) {
+            return { message: `Valor inmediato no definido para instrucción tipo I '${definition.mnemonic}'.`, stage: 'conversion' };
+        }
+    }
 
-    immBin = numToBinary(operands.immediateValue, 16, true); // Inmediato de 16 bits, con signo extendido
-    if (typeof immBin !== 'string') return immBin; // Error de numToBinary
+    // Convertir la fuente a un número (immVal)
+    if (typeof immediateSource === 'number') {
+        immVal = immediateSource;
+    } else if (typeof immediateSource === 'string') {
+        if (/^-?\d+$/.test(immediateSource)) { // Es un string puramente numérico
+            immVal = parseInt(immediateSource, 10);
+        } else { // Es una etiqueta simbólica no numérica
+            // Para beq, esto es un error ya que no resolvemos etiquetas simbólicas a offsets
+            if (definition.mnemonic === 'beq' /* || otras branches */) {
+                return {
+                    message: `Etiqueta de salto simbólica '${immediateSource}' para '${definition.mnemonic}' no se puede resolver a un offset numérico. Ingrese un offset numérico.`,
+                    stage: 'conversion'
+                };
+            } else {
+                // Para otras I-types que no sean branches, un inmediato no numérico es un error claro.
+                return { message: `Valor inmediato '${immediateSource}' para '${definition.mnemonic}' no es un número válido.`, stage: 'conversion' };
+            }
+        }
+    } else { // Si immediateSource sigue indefinido o es de otro tipo
+         return { message: `Fuente de inmediato/etiqueta inválida para '${definition.mnemonic}': '${String(immediateSource)}'.`, stage: 'conversion'};
+    }
+
+    // Ahora immVal es un número. numToBinary validará el rango (16 bits con signo).
+    // El offset de beq es un número de palabras, pero el campo inmediato es ese número.
+    // El ensamblador real calcularía: offset_campo = (direccion_etiqueta - (PC_actual + 4)) / 4
+    // Aquí, asumimos que el número ingresado para beq YA ES el offset_campo.
+    immBin = numToBinary(immVal, 16, true);
+    if (typeof immBin !== 'string') {
+        return { message: `Error en valor inmediato/offset (${immVal}) para '${definition.mnemonic}': ${immBin.message}`, stage: 'conversion'};
+    }
 
     fields.rs = rsBin; fields.rt = rtBin; fields.immediate = immBin;
     binaryAccumulator += rsBin + rtBin + immBin;
 
   } else if (definition.type === 'J') {
-    if (operands.labelName === undefined) return { message: "Etiqueta/dirección no definida para tipo J.", stage: 'conversion' };
-
-    // La conversión de etiqueta a dirección numérica real es compleja (requiere tabla de símbolos o PC actual).
-    // Por ahora, si es un número, lo usamos. Si no, placeholder.
-    let targetAddressNum: number;
-    if (typeof operands.labelName === 'number') {
-        targetAddressNum = operands.labelName;
-    } else if (typeof operands.labelName === 'string' && /^\d+$/.test(operands.labelName)) {
-        targetAddressNum = parseInt(operands.labelName, 10);
-    } else {
-        // Placeholder para etiquetas no numéricas. Un ensamblador real resolvería esto.
-        // Aquí podrías devolver un error o usar un valor por defecto (ej. 0) y una advertencia.
-        console.warn(`Advertencia: Etiqueta de salto '${operands.labelName}' no resuelta a número. Usando 0.`);
-        targetAddressNum = 0;
+    if (operands.labelName === undefined && typeof operands.immediateValue !== 'number') { // Aceptamos labelName o immediateValue para dirección J
+        return { message: "Etiqueta/dirección no definida para tipo J.", stage: 'conversion' };
     }
 
-    // En MIPS, la dirección de salto de 26 bits se refiere a una dirección de palabra,
-    // y se combina con los 4 bits superiores del PC actual.
-    // La dirección real = (PC+4)[31:28] || (target_address * 4)
-    // Aquí, el 'target_address' en la instrucción es (dirección_real / 4) & 0x03FFFFFF
-    const pseudoDirectAddress = Math.floor(targetAddressNum / 4); // Simplificación: Asumimos que targetAddressNum ya es la dirección de palabra deseada.
-                                                               // Un ensamblador real manejaría esto con más precisión.
+    let targetAddressNum: number;
+    const addressSource = operands.labelName !== undefined ? operands.labelName : operands.immediateValue;
+    if (typeof addressSource === 'number') {
+        targetAddressNum = addressSource;
+    } else if (typeof addressSource === 'string') {
+       if (/^-?\d+$/.test(addressSource)) { // Es un string numérico (decimal, puede ser negativo aunque para J no tiene sentido)
+            targetAddressNum = parseInt(addressSource, 10);
+            // Para J, la dirección no debe ser negativa.
+            if (targetAddressNum < 0) {
+                 return { message: `La dirección de salto para '${definition.mnemonic}' no puede ser negativa: '${addressSource}'.`, stage: 'conversion'};
+            }
+        } else { // Es una etiqueta simbólica no numérica
+            // <<<--- CAMBIO AQUÍ: Devolver error en lugar de advertencia y default 0 ---<<<
+            return {
+                message: `Etiqueta de salto simbólica '${addressSource}' no se puede resolver a una dirección numérica. La resolución de etiquetas no está implementada.`,
+                stage: 'conversion'
+            };
+        }
+    } else {
+         return { message: `Fuente de dirección inválida para tipo J: '${String(addressSource)}'. Se esperaba un número o una etiqueta.`, stage: 'conversion'};
+    }
+    // El campo de dirección en la instrucción J es la dirección de palabra / 4.
+    // La dirección de memoria de destino suele ser de 32 bits.
+    // El campo de instrucción es de 26 bits. La dirección_de_memoria = (PC[31-28] || (campo_target * 4))
+    // Por lo tanto, campo_target = (dirección_de_memoria / 4) & 0x03FFFFFF.
+    // Aquí 'targetAddressNum' representa la dirección de memoria de destino.
+    if (targetAddressNum % 4 !== 0) {
+        return { message: `La dirección de destino para '${definition.mnemonic}' (${targetAddressNum}) debe ser divisible por 4 (alineada a palabra).`, stage: 'conversion'};
+    }
+    const pseudoDirectAddressField = targetAddressNum / 4;
 
-    addrBin = numToBinary(pseudoDirectAddress, 26, false); // Dirección de 26 bits, sin signo
-    if (typeof addrBin !== 'string') return addrBin; // Error de numToBinary
+    addrBin = numToBinary(pseudoDirectAddressField, 26, false);
+    if (typeof addrBin !== 'string') {
+        return { message: `Error al convertir dirección para '${definition.mnemonic}' (campo de 26 bits para ${pseudoDirectAddressField}): ${addrBin.message}`, stage: 'conversion'};
+    }
 
     fields.address = addrBin;
     binaryAccumulator += addrBin;
@@ -165,5 +234,5 @@ export function binaryToHex(binary: string): string | MipsError {
     const nibble = binary.substring(i, i + 4);
     hex += parseInt(nibble, 2).toString(16);
   }
-  return "0x" + hex.toUpperCase().padStart(8, '0'); // Asegurar 8 dígitos hexadecimales
+  return "0x" + hex.toUpperCase().padStart(8, '0');
 }

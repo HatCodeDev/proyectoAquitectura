@@ -21,7 +21,7 @@ export default function DefaultLayout({
           title="heroui.com homepage"
         >
           <span className="text-default-600">Powered by</span>
-          <p className="text-primary">HeroUI</p>
+          <p className="text-primary">Equipo 4</p>
         </Link>
       </footer>
     </div>

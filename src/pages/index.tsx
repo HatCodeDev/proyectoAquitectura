@@ -1,4 +1,5 @@
 // src/pages/index.tsx
+import React from "react";
 import { Link } from "@heroui/link";
 import { Snippet } from "@heroui/snippet";
 import { button as buttonStyles } from "@heroui/theme";
@@ -6,7 +7,7 @@ import { button as buttonStyles } from "@heroui/theme";
 import { siteConfig } from "@/config/site";
 import { GithubIcon } from "@/components/icons";
 import DefaultLayout from "@/layouts/default";
-
+import {Alert} from "@heroui/alert";
 import { MipsInputForm } from '@/components/mips/MipsInputForm';
 import { useMipsInterpreter } from '@/hooks/useMipsInterpreter';
 import { InstructionOutput } from '@/components/mips/InstructionOutput';
@@ -14,7 +15,6 @@ import { FieldsBreakdown } from '@/components/mips/FieldsBreakdown';
 
 export default function IndexPage() {
   const { isLoading, result, error, processInstruction } = useMipsInterpreter();
-
   return (
     <DefaultLayout>
       <section className="flex flex-col items-center justify-center gap-6 py-8 md:py-10">
@@ -42,10 +42,15 @@ export default function IndexPage() {
           )}
 
           {error && !isLoading && (
-            <Snippet hideSymbol hideCopyButton color="danger" className="w-full">
-              <strong>Error:</strong> {error.message} {error.stage && `(Etapa: ${error.stage})`}
-            </Snippet>
+            <Alert
+            color="danger"
+            description={error.stage}
+            title={error.message}
+            variant="faded"
+            />
           )}
+
+          
 
           {result && !isLoading && (
             <div className="w-full flex flex-col gap-6"> 

@@ -3,6 +3,7 @@ import React from 'react';
 import {Card, CardHeader, CardBody, CardFooter} from "@heroui/card";
 import { Code } from '@heroui/code';
 import { MipsInterpretationResult } from '@/types';
+import {Chip} from "@heroui/chip";
 
 interface InstructionOutputProps {
   result: Partial<MipsInterpretationResult>;
@@ -30,28 +31,30 @@ export const InstructionOutput: React.FC<InstructionOutputProps> = ({ result }) 
       </CardHeader>
       <CardBody className="pt-2 space-y-3"> {/* Menos padding superior para el body */}
         <div>
-          <p className="text-sm text-default-500 mb-0.5">Instrucción Original:</p>
+          <p className="text-sm text-default-500 mb-2">Instrucción Original:</p>
           <Code className="block w-full text-sm p-2 bg-default-100 rounded-md break-all">
             {result.rawInstruction || 'N/A'}
           </Code>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <div>
-            <p className="text-sm text-default-500 mb-0.5">Mnemónico:</p>
-            <Code color="secondary" className="text-md px-1 py-0.5 rounded-sm">
+            <p className="text-sm text-default-500 mb-2">Mnemónico:</p>
+            <Chip color="secondary" variant="shadow">
               {result.mnemonic || 'N/A'}
-            </Code>
+            </Chip>
+            
           </div>
           <div>
-            <p className="text-sm text-default-500 mb-0.5">Tipo:</p>
-            <Code color="primary" className="text-md px-1 py-0.5 rounded-sm">
+            <p className="text-sm text-default-500 mb-2">Tipo:</p>
+            <Chip color="primary" variant="shadow">
               {result.type || 'N/A'}
-            </Code>
+            </Chip>
+            
           </div>
         </div>
         {result.binary && (
           <div>
-            <p className="text-sm text-default-500 mb-0.5">Binario (32 bits):</p>
+            <p className="text-sm text-default-500 mb-2">Binario (32 bits):</p>
             <Code className="block w-full text-xs sm:text-sm p-2 bg-default-100 rounded-md break-all">
               {formatBinaryString(result.binary)}
             </Code>
@@ -59,7 +62,7 @@ export const InstructionOutput: React.FC<InstructionOutputProps> = ({ result }) 
         )}
         {result.hexadecimal && (
           <div>
-            <p className="text-sm text-default-500 mb-0.5">Hexadecimal:</p>
+            <p className="text-sm text-default-500 mb-2">Hexadecimal:</p>
             <Code className="block w-full text-sm p-2 bg-default-100 rounded-md">
               {result.hexadecimal || 'N/A'}
             </Code>
@@ -68,8 +71,8 @@ export const InstructionOutput: React.FC<InstructionOutputProps> = ({ result }) 
       </CardBody>
       {result.explanation && (
         <CardFooter className="flex flex-col items-start pt-2 border-t border-default-200 dark:border-default-100">
-          <p className="text-sm font-medium text-default-600 dark:text-default-300 mb-1">Explicación:</p>
-          <p className="text-sm text-default-700 dark:text-default-200">{result.explanation}</p>
+          <p className="text-sm font-medium text-default-600  dark:text-white mb-1">Explicación:</p>
+          <p className="text-sm text-default-700 dark:text-white">{result.explanation}</p>
         </CardFooter>
       )}
     </Card>

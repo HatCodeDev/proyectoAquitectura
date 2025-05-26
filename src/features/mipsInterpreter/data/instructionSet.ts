@@ -7,53 +7,59 @@ import { OPCODES, FUNCT_CODES } from '@/config/mipsConstants';   // Ajusta la ru
 export const MIPS_INSTRUCTION_SET: Record<string, InstructionDefinition> = {
   // --- Tipo R ---
   'add': {
-    mnemonic: 'add',
-    type: 'R',
-    opcode: OPCODES.r_type, // Todas las tipo R tienen opcode '000000'
-    funct: FUNCT_CODES.add,
-    formatString: "rd, rs, rt", // Orden de operandos en la sintaxis assembly
-    description: "Suma el contenido de los registros 'rs' y 'rt' (interpretados como números con signo) y almacena el resultado en el registro 'rd'. Si ocurre un desbordamiento (overflow), se genera una excepción."
+    mnemonic: 'add', type: 'R', opcode: OPCODES.r_type, funct: FUNCT_CODES.add,
+    formatString: "rd, rs, rt",
+    description: "Suma el contenido de 'rs' y 'rt' (con signo) y almacena el resultado en 'rd'. Causa excepción en overflow."
   },
-  // (Podrías añadir 'sub' aquí de manera similar si quieres)
-  // 'sub': {
-  //   mnemonic: 'sub',
-  //   type: 'R',
-  //   opcode: OPCODES.r_type,
-  //   funct: FUNCT_CODES.sub,
-  //   formatString: "rd, rs, rt",
-  //   description: "Resta el contenido del registro 'rt' del registro 'rs' (interpretados como números con signo) y almacena el resultado en 'rd'. Si ocurre un desbordamiento (overflow), se genera una excepción."
-  // },
+  'sub': { // <<<--- NUEVA (o descomentada y completada)
+    mnemonic: 'sub', type: 'R', opcode: OPCODES.r_type, funct: FUNCT_CODES.sub,
+    formatString: "rd, rs, rt",
+    description: "Resta el contenido de 'rt' de 'rs' (con signo) y almacena el resultado en 'rd'. Causa excepción en overflow."
+  },
+  'and': { // <<<--- NUEVA
+    mnemonic: 'and', type: 'R', opcode: OPCODES.r_type, funct: FUNCT_CODES.and,
+    formatString: "rd, rs, rt",
+    description: "Realiza un AND lógico bit a bit entre 'rs' y 'rt', y almacena el resultado en 'rd'."
+  },
+  'sll': { // <<<--- NUEVA
+    mnemonic: 'sll', type: 'R', opcode: OPCODES.r_type, funct: FUNCT_CODES.sll,
+    // El formato ensamblador es rd, rt, shamt. El campo 'rs' de la instrucción máquina es 0.
+    formatString: "rd, rt, shamt", // shamt es un valor inmediato de 5 bits
+    description: "Desplaza lógicamente a la izquierda el contenido de 'rt' por 'shamt' bits, rellenando con ceros. El resultado se almacena en 'rd'. El campo 'rs' de la instrucción máquina es cero."
+  },
+  'slt': { // <<<--- NUEVA
+    mnemonic: 'slt', type: 'R', opcode: OPCODES.r_type, funct: FUNCT_CODES.slt,
+    formatString: "rd, rs, rt",
+    description: "Establece 'rd' a 1 si 'rs' (con signo) es menor que 'rt' (con signo), de lo contrario establece 'rd' a 0."
+  },
 
   // --- Tipo I ---
   'addi': {
-    mnemonic: 'addi',
-    type: 'I',
-    opcode: OPCODES.addi,
-    // funct no aplica para tipo I
-    formatString: "rt, rs, immediate", // rt es el destino, rs es fuente, immediate es valor de 16 bits con signo extendido
-    description: "Suma el contenido del registro 'rs' con el valor inmediato de 16 bits (extendido con signo a 32 bits) y almacena el resultado en el registro 'rt'. Si ocurre un desbordamiento (overflow), se genera una excepción."
+    mnemonic: 'addi', type: 'I', opcode: OPCODES.addi,
+    formatString: "rt, rs, immediate",
+    description: "Suma 'rs' con el inmediato de 16 bits (con signo extendido) y almacena en 'rt'. Causa excepción en overflow."
   },
   'lw': {
-    mnemonic: 'lw',
-    type: 'I', // Load Word es una instrucción de tipo I
-    opcode: OPCODES.lw,
-    formatString: "rt, offset(rs)", // rt es el destino, offset es el inmediato, rs es el registro base
-    description: "Carga una palabra (32 bits) desde la memoria a 'rt'. La dirección de memoria se calcula sumando 'offset' (inmediato de 16 bits, con signo extendido) al contenido de 'rs'."
+    mnemonic: 'lw', type: 'I', opcode: OPCODES.lw,
+    formatString: "rt, offset(rs)",
+    description: "Carga una palabra desde la memoria a 'rt'. Dirección = 'rs' + offset (16 bits con signo extendido)."
   },
-  'sw': {
-    mnemonic: 'sw',
-    type: 'I', // Store Word es una instrucción de tipo I
-    opcode: OPCODES.sw,
-    formatString: "rt, offset(rs)", // rt es la fuente, offset es el inmediato, rs es el registro base
-    description: "Almacena una palabra (32 bits) desde 'rt' en la memoria. La dirección de memoria se calcula sumando 'offset' (inmediato de 16 bits, con signo extendido) al contenido de 'rs'."
+  'sw': { // Asumo que ya la tenías, si no, añádela también.
+    mnemonic: 'sw', type: 'I', opcode: OPCODES.sw,
+    formatString: "rt, offset(rs)",
+    description: "Almacena la palabra de 'rt' en memoria. Dirección = 'rs' + offset (16 bits con signo extendido)."
   },
   'beq': {
-    mnemonic: 'beq',
-    type: 'I', // Branch on Equal es de tipo I (opcode, rs, rt, offset/label)
-    opcode: OPCODES.beq,
-    formatString: "rs, rt, label", // rs y rt son registros a comparar, label es el desplazamiento relativo de 16 bits (multiplicado por 4)
-    description: "Si el contenido del registro 'rs' es igual al contenido del registro 'rt', salta a la dirección indicada por 'label'. El 'label' es un desplazamiento relativo a la instrucción siguiente, multiplicado por 4."
+    mnemonic: 'beq', type: 'I', opcode: OPCODES.beq,
+    formatString: "rs, rt, label", // label es un offset de 16 bits
+    description: "Si 'rs' == 'rt', salta a la dirección PC + 4 + (offset << 2). El offset es con signo."
   },
+  'bne': { // <<<--- NUEVA
+    mnemonic: 'bne', type: 'I', opcode: OPCODES.bne,
+    formatString: "rs, rt, label", // label es un offset de 16 bits
+    description: "Si 'rs' != 'rt', salta a la dirección PC + 4 + (offset << 2). El offset es con signo."
+  },
+
 
   // --- Tipo J ---
   'j': {

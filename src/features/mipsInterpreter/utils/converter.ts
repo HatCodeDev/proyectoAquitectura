@@ -88,45 +88,57 @@ export function assembleInstruction(
   let rdBin: string | MipsError;
   let shamtVal: number;
   let shamtBin: string | MipsError;
-  let immVal: number;
+  let immVal: number; // Para el valor numérico del inmediato/offset
   let immBin: string | MipsError;
-  let addrBin: string | MipsError;
+  let addrBin: string | MipsError; // Para el campo de dirección de J-type
 
   if (definition.type === 'R') {
-    rsBin = getRegisterBinary(operands.rsName, 'rs');
-    if (typeof rsBin !== 'string') return rsBin;
-    rtBin = getRegisterBinary(operands.rtName, 'rt');
-    if (typeof rtBin !== 'string') return rtBin;
+    // --- LÓGICA PARA TIPO R (INCLUYENDO SLL) ---
     rdBin = getRegisterBinary(operands.rdName, 'rd');
     if (typeof rdBin !== 'string') return rdBin;
 
-    shamtVal = operands.shamtValue === undefined ? 0 : operands.shamtValue; // Default a 0 si no se parseó (ej. para add)
-    if (typeof shamtVal !== 'number' || isNaN(shamtVal)) { // Chequeo adicional por si ParsedOperands lo permite
-        return { message: `Valor de shamt '${operands.shamtValue}' no es un número válido.`, stage: 'conversion'};
-    }
-    // Validación de rango para shamt (0-31) ahora se hace en numToBinary
-    shamtBin = numToBinary(shamtVal, 5, false);
-    if (typeof shamtBin !== 'string') return { message: `Error en valor de shamt (${shamtVal}): ${shamtBin.message}`, stage: 'conversion'};
+    // Para sll, srl, sra: el operando ensamblador es rd, rt, shamt.
+    // El campo 'rs' en la instrucción máquina es 0.
+    if (definition.mnemonic === 'sll' || definition.mnemonic === 'srl' || definition.mnemonic === 'sra') {
+      rsBin = "00000"; // Campo rs es 0 para sll, srl, sra
+      rtBin = getRegisterBinary(operands.rtName, 'rt (fuente para shift)');
+      if (typeof rtBin !== 'string') return rtBin;
 
-    if (!definition.funct) return { message: "Definición de instrucción tipo R no tiene campo 'funct'.", stage: 'conversion' };
+      if (operands.shamtValue === undefined || typeof operands.shamtValue !== 'number') {
+           return { message: `Valor de shamt no definido o inválido para '${definition.mnemonic}'. Se esperaba un número.`, stage: 'conversion' };
+      }
+      shamtVal = operands.shamtValue; // Ya validado en parser.ts (0-31)
+    } else { // Para otras instrucciones R como add, sub, and, slt
+      rsBin = getRegisterBinary(operands.rsName, 'rs');
+      if (typeof rsBin !== 'string') return rsBin;
+      rtBin = getRegisterBinary(operands.rtName, 'rt');
+      if (typeof rtBin !== 'string') return rtBin;
+      shamtVal = 0; // Para add, sub, and, slt, etc., el campo shamt es 0
+    }
+
+    shamtBin = numToBinary(shamtVal, 5, false);
+    if (typeof shamtBin !== 'string') return { message: `Error en valor de shamt (${shamtVal}) para '${definition.mnemonic}': ${shamtBin.message}`, stage: 'conversion'};
+
+    if (!definition.funct) return { message: `Definición de instrucción tipo R '${definition.mnemonic}' no tiene campo 'funct'.`, stage: 'conversion' };
 
     fields.rs = rsBin; fields.rt = rtBin; fields.rd = rdBin; fields.shamt = shamtBin; fields.funct = definition.funct;
     binaryAccumulator += rsBin + rtBin + rdBin + shamtBin + definition.funct;
 
   } else if (definition.type === 'I') {
+    // --- LÓGICA PARA TIPO I (INCLUYENDO BNE Y HEXADECIMALES) ---
     rsBin = getRegisterBinary(operands.rsName, 'rs (o base)');
     if (typeof rsBin !== 'string') return rsBin;
     rtBin = getRegisterBinary(operands.rtName, 'rt');
     if (typeof rtBin !== 'string') return rtBin;
 
-    // Determinar la fuente del valor inmediato/offset
     let immediateSource: string | number | undefined;
-    // Para beq (y bne, etc.), el parser guarda la etiqueta en labelName
+
+    // Para beq, bne, el parser guarda la etiqueta/offset en labelName
     // según formatString "rs, rt, label"
-    if (definition.mnemonic === 'beq' /* || definition.mnemonic === 'bne' etc. */) {
+    if (definition.mnemonic === 'beq' || definition.mnemonic === 'bne') {
         immediateSource = operands.labelName;
         if (immediateSource === undefined) {
-            return { message: `Etiqueta no definida para instrucción '${definition.mnemonic}'.`, stage: 'conversion'};
+            return { message: `Etiqueta/offset no definido para instrucción '${definition.mnemonic}'.`, stage: 'conversion'};
         }
     } else { // Para otras instrucciones tipo I como addi, lw, sw
         immediateSource = operands.immediateValue;
@@ -135,32 +147,33 @@ export function assembleInstruction(
         }
     }
 
-    // Convertir la fuente a un número (immVal)
+    // Convertir la fuente a un número (immVal), permitiendo hexadecimal
     if (typeof immediateSource === 'number') {
         immVal = immediateSource;
     } else if (typeof immediateSource === 'string') {
-        if (/^-?\d+$/.test(immediateSource)) { // Es un string puramente numérico
+        if (immediateSource.toLowerCase().startsWith('0x')) { // Hexadecimal
+            immVal = parseInt(immediateSource.substring(2), 16);
+            if (isNaN(immVal)) {
+                return { message: `Valor inmediato/offset hexadecimal inválido '${immediateSource}' para '${definition.mnemonic}'.`, stage: 'conversion'};
+            }
+        } else if (/^-?\d+$/.test(immediateSource)) { // Decimal
             immVal = parseInt(immediateSource, 10);
-        } else { // Es una etiqueta simbólica no numérica
-            // Para beq, esto es un error ya que no resolvemos etiquetas simbólicas a offsets
-            if (definition.mnemonic === 'beq' /* || otras branches */) {
+        } else { // Etiqueta simbólica no numérica
+            if (definition.mnemonic === 'beq' || definition.mnemonic === 'bne') {
                 return {
-                    message: `Etiqueta de salto simbólica '${immediateSource}' para '${definition.mnemonic}' no se puede resolver a un offset numérico. Ingrese un offset numérico.`,
+                    message: `Etiqueta de salto simbólica '${immediateSource}' para '${definition.mnemonic}' no se puede resolver. Ingrese un offset numérico (decimal o 0xhex).`,
                     stage: 'conversion'
                 };
-            } else {
-                // Para otras I-types que no sean branches, un inmediato no numérico es un error claro.
-                return { message: `Valor inmediato '${immediateSource}' para '${definition.mnemonic}' no es un número válido.`, stage: 'conversion' };
+            } else { // Para addi, lw, sw, etc., un inmediato no numérico (y no hex) es un error.
+                return { message: `Valor inmediato '${immediateSource}' para '${definition.mnemonic}' no es un número válido (decimal o 0xhex).`, stage: 'conversion' };
             }
         }
-    } else { // Si immediateSource sigue indefinido o es de otro tipo
-         return { message: `Fuente de inmediato/etiqueta inválida para '${definition.mnemonic}': '${String(immediateSource)}'.`, stage: 'conversion'};
+    } else {
+         return { message: `Fuente de inmediato/etiqueta inválida para '${definition.mnemonic}': '${String(immediateSource)}'. Se esperaba un número o una cadena.`, stage: 'conversion'};
     }
 
     // Ahora immVal es un número. numToBinary validará el rango (16 bits con signo).
-    // El offset de beq es un número de palabras, pero el campo inmediato es ese número.
-    // El ensamblador real calcularía: offset_campo = (direccion_etiqueta - (PC_actual + 4)) / 4
-    // Aquí, asumimos que el número ingresado para beq YA ES el offset_campo.
+    // Para beq/bne, immVal debe ser el offset de palabras.
     immBin = numToBinary(immVal, 16, true);
     if (typeof immBin !== 'string') {
         return { message: `Error en valor inmediato/offset (${immVal}) para '${definition.mnemonic}': ${immBin.message}`, stage: 'conversion'};
@@ -170,54 +183,59 @@ export function assembleInstruction(
     binaryAccumulator += rsBin + rtBin + immBin;
 
   } else if (definition.type === 'J') {
-    if (operands.labelName === undefined && typeof operands.immediateValue !== 'number') { // Aceptamos labelName o immediateValue para dirección J
-        return { message: "Etiqueta/dirección no definida para tipo J.", stage: 'conversion' };
+    // --- LÓGICA PARA TIPO J (INCLUYENDO HEXADECIMALES) ---
+    // El parser guarda la dirección/etiqueta en labelName para 'j'
+    const addressSource = operands.labelName !== undefined ? operands.labelName : operands.immediateValue;
+
+    if (addressSource === undefined) {
+        return { message: `Etiqueta/dirección no definida para instrucción tipo J '${definition.mnemonic}'.`, stage: 'conversion' };
     }
 
     let targetAddressNum: number;
-    const addressSource = operands.labelName !== undefined ? operands.labelName : operands.immediateValue;
+
     if (typeof addressSource === 'number') {
         targetAddressNum = addressSource;
     } else if (typeof addressSource === 'string') {
-       if (/^-?\d+$/.test(addressSource)) { // Es un string numérico (decimal, puede ser negativo aunque para J no tiene sentido)
-            targetAddressNum = parseInt(addressSource, 10);
-            // Para J, la dirección no debe ser negativa.
-            if (targetAddressNum < 0) {
-                 return { message: `La dirección de salto para '${definition.mnemonic}' no puede ser negativa: '${addressSource}'.`, stage: 'conversion'};
+        if (addressSource.toLowerCase().startsWith('0x')) { // Hexadecimal
+            targetAddressNum = parseInt(addressSource.substring(2), 16);
+            if (isNaN(targetAddressNum)) {
+                return { message: `Dirección hexadecimal inválida '${addressSource}' para '${definition.mnemonic}'.`, stage: 'conversion'};
             }
-        } else { // Es una etiqueta simbólica no numérica
-            // <<<--- CAMBIO AQUÍ: Devolver error en lugar de advertencia y default 0 ---<<<
+        } else if (/^-?\d+$/.test(addressSource)) { // Decimal
+            targetAddressNum = parseInt(addressSource, 10);
+        } else { // Etiqueta simbólica no numérica
             return {
-                message: `Etiqueta de salto simbólica '${addressSource}' no se puede resolver a una dirección numérica. La resolución de etiquetas no está implementada.`,
+                message: `Etiqueta de salto simbólica '${addressSource}' para '${definition.mnemonic}' no se puede resolver a una dirección numérica. Ingrese una dirección numérica (decimal o 0xhex).`,
                 stage: 'conversion'
             };
         }
+        // Para J, la dirección de destino no debe ser negativa.
+        if (targetAddressNum < 0) {
+             return { message: `La dirección de salto para '${definition.mnemonic}' no puede ser negativa: '${addressSource}'.`, stage: 'conversion'};
+        }
     } else {
-         return { message: `Fuente de dirección inválida para tipo J: '${String(addressSource)}'. Se esperaba un número o una etiqueta.`, stage: 'conversion'};
+         return { message: `Fuente de dirección inválida para tipo J: '${String(addressSource)}'. Se esperaba un número o una cadena.`, stage: 'conversion'};
     }
-    // El campo de dirección en la instrucción J es la dirección de palabra / 4.
-    // La dirección de memoria de destino suele ser de 32 bits.
-    // El campo de instrucción es de 26 bits. La dirección_de_memoria = (PC[31-28] || (campo_target * 4))
-    // Por lo tanto, campo_target = (dirección_de_memoria / 4) & 0x03FFFFFF.
-    // Aquí 'targetAddressNum' representa la dirección de memoria de destino.
+
     if (targetAddressNum % 4 !== 0) {
         return { message: `La dirección de destino para '${definition.mnemonic}' (${targetAddressNum}) debe ser divisible por 4 (alineada a palabra).`, stage: 'conversion'};
     }
-    const pseudoDirectAddressField = targetAddressNum / 4;
+    const pseudoDirectAddressField = targetAddressNum / 4; // El campo en la instrucción es la dirección de palabra/4
 
-    addrBin = numToBinary(pseudoDirectAddressField, 26, false);
+    addrBin = numToBinary(pseudoDirectAddressField, 26, false); // 26 bits para el campo de dirección
     if (typeof addrBin !== 'string') {
         return { message: `Error al convertir dirección para '${definition.mnemonic}' (campo de 26 bits para ${pseudoDirectAddressField}): ${addrBin.message}`, stage: 'conversion'};
     }
 
     fields.address = addrBin;
     binaryAccumulator += addrBin;
+
   } else {
     return { message: "Tipo de instrucción desconocido para ensamblaje.", stage: 'conversion' };
   }
 
   if (binaryAccumulator.length !== 32) {
-    return { message: `Error de ensamblaje: longitud binaria final es ${binaryAccumulator.length} bits, se esperaban 32.`, stage: 'conversion' };
+    return { message: `Error de ensamblaje: longitud binaria final es ${binaryAccumulator.length} bits para la instrucción '${definition.mnemonic}', se esperaban 32.`, stage: 'conversion' };
   }
   return { binary: binaryAccumulator, fields };
 }

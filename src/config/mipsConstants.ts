@@ -20,38 +20,30 @@ export const REGISTERS: { [key: string]: number } = {
 // Opcodes para las instrucciones que vamos a definir inicialmente
 // El valor es el string binario de 6 bits del opcode.
 export const OPCODES: { [key: string]: string } = {
-  // Usaremos 'r_type' como un identificador genérico para instrucciones tipo R en instructionSet.
-  // El opcode real para TODAS las instrucciones tipo R es '000000'.
-  'r_type': '000000',
-  'addi':   '001000', // ADDI, ADDIU (usaremos ADDI por ahora)
-  'lw':     '100011', // Load Word
-  'sw':     '101011', // Store Word
-  'beq':    '000100', // Branch on Equal
-  'j':      '000010', // Jump
-  // Podrías añadir más aquí si quieres, ej:
-  // 'andi': '001100',
-  // 'ori':  '001101',
-  // 'slti': '001010',
-  // 'lui':  '001111',
-  // 'bne':  '000101',
-  // 'jal':  '000011',
+  'r_type': '000000', // Opcode para todas las instrucciones tipo R
+  'addi':   '001000',
+  'lw':     '100011',
+  'sw':     '101011',
+  'beq':    '000100',
+  'j':      '000010',
+  // --- NUEVOS OPCODES ---
+  'bne':    '000101', // Branch on Not Equal
+  // 'andi': '001100', // (Ejemplo para futuras expansiones)
+  // 'ori':  '001101', // (Ejemplo para futuras expansiones)
 };
 
 // Funct codes para las instrucciones tipo R que vamos a definir inicialmente.
 // El valor es el string binario de 6 bits del campo funct.
 export const FUNCT_CODES: { [key: string]: string } = {
-  'add':    '100000', // ADD (con overflow)
-  'sub':    '100010', // SUB (con overflow)
-  // Podrías añadir más aquí si quieres, ej:
-  // 'addu': '100001',
-  // 'subu': '100011',
-  // 'and':  '100100',
-  // 'or':   '100101',
-  // 'xor':  '100110',
-  // 'nor':  '100111',
-  // 'slt':  '101010',
-  // 'sltu': '101011',
-  // 'sll':  '000000', // Shift Left Logical (rd, rt, shamt)
-  // 'srl':  '000010', // Shift Right Logical
-  // 'jr':   '001000', // Jump Register (usa rs)
+  'add':    '100000', // ADD (causa excepción en overflow)
+  'sub':    '100010', // SUB (causa excepción en overflow)
+  // --- NUEVOS FUNCT CODES ---
+  'and':    '100100', // AND lógico
+  'sll':    '000000', // Shift Left Logical (usa shamt, no rs)
+  'slt':    '101010', // Set on Less Than (con signo)
+  // 'or':   '100101', // (Ejemplo para futuras expansiones)
+  // 'xor':  '100110', // (Ejemplo para futuras expansiones)
+  // 'srl':  '000010', // (Ejemplo para futuras expansiones)
+  // 'sra':  '000011', // (Ejemplo para futuras expansiones)
+  // 'jr':   '001000', // (Ejemplo para futuras expansiones)
 };

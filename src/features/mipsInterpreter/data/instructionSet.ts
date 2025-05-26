@@ -1,5 +1,5 @@
 // src/features/mipsInterpreter/data/instructionSet.ts
-import { InstructionDefinition, InstructionType } from '@/types'; // Ajusta la ruta si es necesario
+import { InstructionDefinition } from '@/types'; // Ajusta la ruta si es necesario
 import { OPCODES, FUNCT_CODES } from '@/config/mipsConstants';   // Ajusta la ruta si es necesario
 
 // Este es el conjunto inicial de instrucciones que soportará nuestro intérprete.

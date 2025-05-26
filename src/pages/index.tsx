@@ -1,7 +1,5 @@
 // src/pages/index.tsx
-import React from "react";
 import { Link } from "@heroui/link";
-import { Snippet } from "@heroui/snippet";
 import { button as buttonStyles } from "@heroui/theme";
 
 import { siteConfig } from "@/config/site";
@@ -69,9 +67,9 @@ export default function IndexPage() {
                radius: "full",
                variant: "ghost",
              })}
-             href={siteConfig.links.docs}
+             href= "https://docs.google.com/document/d/15tOtJuFUu27OmmSu3ZK5unWYdtx8h-SQ5qMJf4wjwXk/edit?usp=sharing"
            >
-             Documentación HeroUI
+             Documentación
            </Link>
            <Link
              isExternal

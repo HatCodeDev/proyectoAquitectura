@@ -1,8 +1,8 @@
 // src/features/mipsInterpreter/mipsLogic.ts
 import { assembleInstruction, binaryToHex } from './utils/converter';
 import {
-  MipsInterpretationResult, MipsError, InstructionDefinition,
-  ParsedOperands, MipsInstructionFields // Asegúrate que ParsedOperands esté aquí
+  MipsInterpretationResult, MipsError, 
+  ParsedOperands // Asegúrate que ParsedOperands esté aquí
 } from '@/types';
 import { tokenizeInstruction, parseOperands, TokenizedInstruction } from './utils/parser';
 import { MIPS_INSTRUCTION_SET } from './data/instructionSet';
